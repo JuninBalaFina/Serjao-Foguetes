@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo Simples - Estilo AA</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1c1c1c; /* Cinza bem escuro */
+            font-family: Arial, sans-serif;
+            color: #ffffff; /* Fontes brancas */
+        }
+        canvas {
+            display: block;
+            margin: auto;
+            background-color: #2c2c2c; /* Fundo do canvas um pouco mais claro */
+            border: 1px solid #444; /* Borda do canvas */
+        }
+        #gameOver, #startScreen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 24px;
+        }
+        #gameOver button, #startScreen button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #e74c3c; /* Vermelho vibrante */
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #gameOver button:hover, #startScreen button:hover {
+            background-color: #c0392b; /* Vermelho escuro */
+        }
+        #timer, #record {
+            position: absolute;
+            font-size: 24px;
+            color: #ffffff; /* Fontes brancas */
+        }
+        #timer {
+            top: 20px;
+            left: 20px;
+        }
+        #record {
+            top: 20px;
+            right: 20px;
+        }
+        /* Estilo para esconder o cursor */
+        .hide-cursor {
+            cursor: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>Fique Esperto</h1>
+        <h6>by Ana, Livia, Fabio, Pedro e Wagner</h6>
+        <p>Clique se estiver PREPARADO!!!!</p>
+        <button id="startButton">Começar Jogo</button>
+    </div>
+
+    <div id="gameOver">
+        Game Over
+        <button id="restartButton">Jogar Novamente</button>
+    </div>
+
+    <div id="timer">Tempo: 0s</div>
+    <div id="record">Record: 0s</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const playerRadius = 20;
+        const ballRadius = 15;
+        const initialBallSpeed = 0.2; // Velocidade inicial lenta
+        let ballSpeed = initialBallSpeed;
+        let balls = [];
+        let addedBallsTimes = [];
+        let colors = ['red', 'green', 'yellow', 'cyan', 'magenta']; // Cores disponíveis
+        let usedColors =
+        [];
+
+        const player = { x: canvas.width / 2, y: canvas.height / 2, radius: playerRadius };
+
+        // Carregar a imagem
+        const playerImage = new Image();
+        playerImage.src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbYyur0yvAR24obbOCvFCW8-bTT8CjyW3vRQ&s'; // Substitua pelo caminho da sua imagem
+
+        balls.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, dx: ballSpeed, dy: ballSpeed, radius: ballRadius, color: 'white' });
+
+        let gameOver = false;
+        let startTime = Date.now();
+        let elapsedTime = 0;
+        let recordTime = parseInt(localStorage.getItem('record'), 10) || 0;
+
+        document.getElementById('record').textContent = `Record: ${recordTime}s`;
+
+        class Particle {
+            constructor(x, y, dx, dy, color) {
+                this.x = x;
+                this.y = y;
+                this.dx = dx;
+                this.dy = dy;
+                this.size = Math.random() * 5 + 2; // Tamanho da partícula
+                this.color = color;
+                this.life = 0; // Vida da partícula
+            }
+
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.life += 1;
+                this.size *= 0.96; // Reduz o tamanho com o tempo
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        let particles = [];
+
+        function drawPlayer() {
+            ctx.drawImage(playerImage, player.x - playerRadius, player.y - playerRadius, playerRadius * 2, playerRadius * 2);
+        }
+
+        function drawBall(ball) {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function updateBall(ball) {
+            if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
+                ball.dx = -ball.dx;
+                createParticles(ball.x, ball.y, ball.dx, ball.dy, 'white');
+            }
+            if (ball.y + ball.dy > canvas.height - ball.radius || ball.y + ball.dy < ball.radius) {
+                ball.dy = -ball.dy;
+                createParticles(ball.x, ball.y, ball.dx, ball.dy, 'white');
+            }
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+        }
+
+        function createParticles(x, y, dx, dy, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push(new Particle(x, y, dx * Math.random() * 0.5, dy * Math.random() * 0.5, color));
+            }
+        }
+
+        function updateParticles() {
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+            particles = particles.filter(particle => particle.size > 0.5); // Remove partículas pequenas
+        }
+
+        function detectCollision() {
+            for (const ball of balls) {
+                const dx = ball.x - player.x;
+                const dy = ball.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < ball.radius + player.radius) {
+                    gameOver = true;
+                    document.getElementById('gameOver').style.display = 'block';
+                    cancelAnimationFrame(animationFrameId);
+                    updateRecord();
+                }
+            }
+        }
+
+        function updateTimer() {
+            const now = Date.now();
+            elapsedTime = Math.floor((now - startTime) / 1000);
+            document.getElementById('timer').textContent = `Tempo: ${elapsedTime}s`;
+        }
+
+        function increaseBallSpeed() {
+            if (elapsedTime % 10 === 0 && elapsedTime !== 0) {
+                ballSpeed += 0.05; // Aumenta a velocidade gradualmente
+                balls.forEach(ball => {
+                    ball.dx = (ball.dx > 0 ? 1 : -1) * ballSpeed;
+                    ball.dy = (ball.dy > 0 ? 1 : -1) * ballSpeed;
+                });
+            }
+        }
+
+        function addNewBall() {
+            const intervals = [30, 60, 90, 120, 150]; // Em segundos
+            const now = Date.now();
+            const currentTimeInSeconds = Math.floor((now - startTime) / 1000);
+
+            intervals.forEach(interval => {
+                if (currentTimeInSeconds >= interval && !addedBallsTimes.includes(interval)) {
+                    if (balls.length < 6) { // Adiciona até 6 bolinhas
+                        let newColor;
+                        do {
+                            newColor = colors[Math.floor(Math.random() * colors.length)];
+                        } while (usedColors.includes(newColor) && colors.length > 1);
+                        usedColors.push(newColor);
+
+                        balls.push({
+                            x: Math.random() * canvas.width,
+                            y: Math.random() * canvas.height,
+                            dx: initialBallSpeed,
+                            dy: initialBallSpeed,
+                            radius: ballRadius,
+                            color: newColor
+                        });
+
+                        // Remove o intervalo da lista de tempos adicionados
+                        addedBallsTimes.push(interval);
+                    }
+                }
+            });
+        }
+
+        function updateRecord() {
+            if (elapsedTime > recordTime) {
+                recordTime = elapsedTime;
+                localStorage.setItem('record', recordTime);
+                document.getElementById('record').textContent = `Record: ${recordTime}s`;
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function update() {
+            if (!gameOver) {
+                clearCanvas();
+                drawPlayer();
+                balls.forEach(ball => {
+                    drawBall(ball);
+                    updateBall(ball);
+                });
+                updateParticles();
+                detectCollision();
+                updateTimer();
+                increaseBallSpeed();
+                addNewBall();
+                animationFrameId = requestAnimationFrame(update);
+            }
+        }
+
+        function restartGame() {
+            gameOver = false;
+            startTime = Date.now();
+            elapsedTime = 0;
+            ballSpeed = initialBallSpeed;
+            balls = [{ x: Math.random() * canvas.width, y: Math.random() * canvas.height, dx: ballSpeed, dy: ballSpeed, radius: ballRadius, color: 'white' }];
+            addedBallsTimes = [];
+            usedColors = [];
+            colors = ['red', 'green', 'yellow', 'cyan', 'magenta']; // Resetar cores disponíveis
+            particles = []; // Limpa partículas
+            document.getElementById('gameOver').style.display = 'none';
+            update();
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.body.classList.add('hide-cursor'); // Esconde o cursor ao começar o jogo
+            update();
+        }
+
+        document.getElementById('restartButton').addEventListener('click', restartGame);
+        document.getElementById('startButton').addEventListener('click', startGame);
+
+        let animationFrameId;
+        // O jogo não inicia automaticamente, aguarda o clique do botão "Começar Jogo"
+
+        window.addEventListener('mousemove', (e) => {
+            if (!gameOver) {
+                player.x = e.clientX;
+                player.y = e.clientY;
+            }
+        });
+        // Mostra a tela de início
+        document.getElementById('startScreen').style.display = 'block';
+    </script>
+</body>
+</html>
